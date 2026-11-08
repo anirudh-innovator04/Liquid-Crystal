@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCD Viewing Angle & Physics Interactive Lab</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js for 3D Scene Rendering -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- OrbitControls for Three.js -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Font: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      overflow-x: hidden;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .active-tab {
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      color: #ffffff;
+      box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.39);
+    }
+    /* Custom Slider Styling */
+    input[type=range] {
+      accent-color: #3b82f6;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col bg-slate-950 text-slate-100 antialiased selection:bg-blue-500 selection:text-white">
+
+  <!-- Header / Navigation Bar -->
+  <header class="w-full glass-panel border-b border-slate-800 py-3 px-4 sm:px-6 flex flex-col sm:flex-row justify-between items-center gap-3 z-20 sticky top-0">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-blue-600/20 text-blue-400 rounded-lg border border-blue-500/30">
+        <i class="fa-solid me-1 fa-display text-xl"></i>
+        <i class="fa-solid fa-eye text-sm"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold bg-gradient-to-r from-white via-slate-200 to-blue-400 bg-clip-text text-transparent">
+          LCD Viewing Angle & Physics Lab
+        </h1>
+        <p class="text-xs text-slate-400">Interactive 3D Display Anisotropy & Birefringence Simulator</p>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex p-1 bg-slate-900/90 rounded-xl border border-slate-800 text-sm font-medium">
+      <button id="tab1Btn" onclick="switchTab('tab1')" class="active-tab px-4 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-2">
+        <i class="fa-solid fa-cube"></i>
+        <span>3D Viewing Simulator</span>
+      </button>
+      <button id="tab2Btn" onclick="switchTab('tab2')" class="px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all duration-200 flex items-center gap-2">
+        <i class="fa-solid fa-atom"></i>
+        <span>LCD Internal Physics</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 relative w-full overflow-hidden flex flex-col">
+
+    <!-- TAB 1: 3D VIEWING ANGLE SIMULATOR -->
+    <section id="tab1" class="flex-1 flex flex-col lg:flex-row w-full h-full relative overflow-y-auto lg:overflow-hidden">
+
+      <!-- Left / Center: 3D Canvas Container -->
+      <div class="relative flex-1 min-h-[400px] lg:min-h-full bg-slate-950 flex flex-col justify-between p-4">
+        
+        <!-- 3D Viewport Label & Quick Helpers -->
+        <div class="absolute top-4 left-4 z-10 flex flex-col gap-2">
+          <div class="glass-panel px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            3D Interactive Environment (Drag to Rotate View)
+          </div>
+          <div class="glass-panel p-2 rounded-lg text-[11px] text-slate-400 max-w-xs hidden sm:block">
+            <i class="fa-solid fa-circle-info text-blue-400 me-1"></i> Orbit around screen with mouse/touch or use sliders on the right to position the observer.
+          </div>
+        </div>
+
+        <!-- Three.js Canvas Element -->
+        <div id="canvas3d-container" class="w-full h-full absolute inset-0 cursor-grab active:cursor-grabbing"></div>
+
+        <!-- Floating Controls overlay inside 3D Canvas for quick perspective resets -->
+        <div class="absolute bottom-4 left-4 z-10 flex gap-2">
+          <button onclick="presetAngle(0, 0)" class="glass-panel hover:bg-slate-800 text-xs px-3 py-1.5 rounded-lg text-slate-200 transition border border-slate-700">
+            Center (0°, 0°)
+          </button>
+          <button onclick="presetAngle(60, 0)" class="glass-panel hover:bg-slate-800 text-xs px-3 py-1.5 rounded-lg text-slate-200 transition border border-slate-700">
+            Side (60°, 0°)
+          </button>
+          <button onclick="presetAngle(0, -45)" class="glass-panel hover:bg-slate-800 text-xs px-3 py-1.5 rounded-lg text-slate-200 transition border border-slate-700">
+            Below (0°, -45°)
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Sidebar: Interactive Controls & Observer POV Display -->
+      <div class="w-full lg:w-96 glass-panel border-t lg:border-t-0 lg:border-l border-slate-800 p-5 flex flex-col gap-6 overflow-y-auto z-10 shrink-0">
+        
+        <!-- Panel Type Selector -->
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+            1. Select LCD Panel Technology
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <button onclick="setPanelType('TN')" id="panelBtn-TN" class="panel-btn py-2 px-1 text-center rounded-xl border border-blue-500 bg-blue-600/20 text-white font-medium text-xs transition">
+              TN
+              <span class="block text-[10px] text-slate-400 font-normal mt-0.5">Twisted Nematic</span>
+            </button>
+            <button onclick="setPanelType('VA')" id="panelBtn-VA" class="panel-btn py-2 px-1 text-center rounded-xl border border-slate-800 bg-slate-900/60 text-slate-400 font-medium text-xs hover:border-slate-700 transition">
+              VA
+              <span class="block text-[10px] text-slate-400 font-normal mt-0.5">Vert. Align</span>
+            </button>
+            <button onclick="setPanelType('IPS')" id="panelBtn-IPS" class="panel-btn py-2 px-1 text-center rounded-xl border border-slate-800 bg-slate-900/60 text-slate-400 font-medium text-xs hover:border-slate-700 transition">
+              IPS
+              <span class="block text-[10px] text-slate-400 font-normal mt-0.5">In-Plane Switch</span>
+            </button>
+          </div>
+          <p id="panelDescription" class="text-xs text-slate-400 mt-2 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800/80 leading-relaxed">
+            <strong class="text-amber-400">TN Panel:</strong> Highly prone to viewing angle degradation. Suffers severe color inversion from below and contrast wash-out at side angles.
+          </p>
+        </div>
+
+        <!-- Angle Sliders -->
+        <div class="space-y-4">
+          <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">
+            2. Observer Viewing Position
+          </label>
+          
+          <!-- Horizontal Angle Slider -->
+          <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center text-xs mb-1">
+              <span class="text-slate-300 font-medium">Horizontal Angle (&theta;)</span>
+              <span id="hAngleVal" class="font-mono text-blue-400 font-bold text-sm">0°</span>
+            </div>
+            <input type="range" id="hAngle" min="-80" max="80" value="0" step="1" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+            <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+              <span>-80° (Left)</span>
+              <span>0° (Direct)</span>
+              <span>+80° (Right)</span>
+            </div>
+          </div>
+
+          <!-- Vertical Angle Slider -->
+          <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+            <div class="flex justify-between items-center text-xs mb-1">
+              <span class="text-slate-300 font-medium">Vertical Angle (&phi;)</span>
+              <span id="vAngleVal" class="font-mono text-blue-400 font-bold text-sm">0°</span>
+            </div>
+            <input type="range" id="vAngle" min="-60" max="60" value="0" step="1" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+            <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+              <span>-60° (Below)</span>
+              <span>0° (Direct)</span>
+              <span>+60° (Above)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Observer POV Screen Output Box -->
+        <div class="flex-1 flex flex-col">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-eye text-blue-400"></i> Observer's POV Display
+            </label>
+            <span id="degradationBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              Optimal Picture
+            </span>
+          </div>
+
+          <!-- Display Screen Frame -->
+          <div class="relative w-full aspect-video rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl bg-black flex items-center justify-center">
+            
+            <!-- Dynamic Simulated Image (HTML Canvas filter) -->
+            <canvas id="povCanvas" class="w-full h-full object-cover"></canvas>
+            
+            <!-- Angle Crosshair Overlay -->
+            <div class="absolute inset-0 pointer-events-none border border-white/10 flex items-center justify-center">
+              <div class="w-4 h-4 border border-dashed border-white/30 rounded-full"></div>
+            </div>
+          </div>
+
+          <!-- POV Specs Readout -->
+          <div class="grid grid-cols-2 gap-2 mt-3 text-[11px]">
+            <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800 flex justify-between">
+              <span class="text-slate-400">Relative Brightness:</span>
+              <span id="statBrightness" class="font-mono font-bold text-emerald-400">100%</span>
+            </div>
+            <div class="bg-slate-900/80 p-2 rounded-lg border border-slate-800 flex justify-between">
+              <span class="text-slate-400">Contrast Ratio:</span>
+              <span id="statContrast" class="font-mono font-bold text-emerald-400">1000:1</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- TAB 2: LCD INTERNAL PHYSICS -->
+    <section id="tab2" class="hidden flex-1 flex-col lg:flex-row w-full h-full overflow-y-auto">
+
+      <!-- Left Physics Visualizer Canvas -->
+      <div class="flex-1 bg-slate-950 p-4 flex flex-col justify-between relative min-h-[450px]">
+        <div class="flex justify-between items-center mb-2 z-10">
+          <div class="glass-panel px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 flex items-center gap-2">
+            <i class="fa-solid fa-microscope text-purple-400"></i>
+            Interactive LCD Layer Micro-Structure & Ray Tracing
+          </div>
+          <div class="flex gap-2">
+            <button onclick="setPhysicsPanel('TN')" id="physBtn-TN" class="text-xs px-3 py-1 rounded-lg border border-purple-500 bg-purple-600/30 text-white font-medium">TN Mode</button>
+            <button onclick="setPhysicsPanel('VA')" id="physBtn-VA" class="text-xs px-3 py-1 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-medium">VA Mode</button>
+            <button onclick="setPhysicsPanel('IPS')" id="physBtn-IPS" class="text-xs px-3 py-1 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-medium">IPS Mode</button>
+          </div>
+        </div>
+
+        <!-- 2D Canvas for Layer Physics Diagram -->
+        <div class="w-full flex-1 relative bg-slate-900/40 rounded-2xl border border-slate-800 overflow-hidden flex items-center justify-center">
+          <canvas id="physicsCanvas" class="w-full h-full block"></canvas>
+        </div>
+
+        <!-- Incident Angle Slider Bar on Physics Tab -->
+        <div class="glass-panel p-4 rounded-xl border border-slate-800 mt-4 flex flex-col sm:flex-row items-center gap-4">
+          <div class="flex items-center gap-2 text-xs text-slate-300 shrink-0">
+            <i class="fa-solid fa-compass text-blue-400 text-base"></i>
+            <span class="font-bold">Incident Ray Angle (&theta;):</span>
+          </div>
+          <input type="range" id="physicsAngle" min="0" max="75" value="0" step="1" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+          <span id="physicsAngleVal" class="font-mono text-purple-400 font-bold text-sm w-12 text-right">0°</span>
+        </div>
+      </div>
+
+      <!-- Right Physics Explanation & Notes Sidebar -->
+      <div class="w-full lg:w-[420px] glass-panel border-t lg:border-t-0 lg:border-l border-slate-800 p-6 overflow-y-auto space-y-6 shrink-0">
+        
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-diagram-project text-blue-400"></i>
+            Why LCD Image Quality Degrades at Angles
+          </h2>
+          <p class="text-xs text-slate-400 mt-1 leading-relaxed">
+            Liquid Crystals are <strong>optically anisotropic</strong> (birefringent) rod-like molecules. Light propagation depends heavily on the angle between the light ray and the crystal director axis.
+          </p>
+        </div>
+
+        <!-- Step-by-Step Breakdown Cards -->
+        <div class="space-y-3">
+          
+          <!-- Step 1: Birefringence -->
+          <div class="bg-slate-900/70 p-3.5 rounded-xl border border-slate-800">
+            <h3 class="text-xs font-bold text-purple-300 flex items-center justify-between">
+              <span>1. Optical Path & Retardation (&Delta;n &middot; d)</span>
+              <i class="fa-solid fa-wave-square text-xs"></i>
+            </h3>
+            <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+              When light enters perpendicular (0°), it experiences the calibrated refractive index thickness <span class="font-mono text-slate-200">d</span>. At oblique angles (&theta; > 0°), the ray travels diagonally through a longer effective path length <span class="font-mono text-slate-200">d' = d / cos(&theta;)</span>, altering the phase shift between ordinary and extraordinary rays.
+            </p>
+          </div>
+
+          <!-- Step 2: Polarizer Crosstalk -->
+          <div class="bg-slate-900/70 p-3.5 rounded-xl border border-slate-800">
+            <h3 class="text-xs font-bold text-blue-300 flex items-center justify-between">
+              <span>2. Polarizer Crosstalk & Light Leakage</span>
+              <i class="fa-solid fa-shield-halved text-xs"></i>
+            </h3>
+            <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+              Subpixel black levels rely on crossed polarizers (90° orientation) completely blocking light. Oblique rays experience an elliptical polarization state shift due to phase retardation error, allowing unwanted light leakage in black states, destroying contrast.
+            </p>
+          </div>
+
+          <!-- Step 3: Panel Architecture Comparison -->
+          <div class="bg-slate-900/70 p-3.5 rounded-xl border border-slate-800">
+            <h3 class="text-xs font-bold text-emerald-300 flex items-center justify-between">
+              <span>3. Panel Technology Comparison</span>
+              <i class="fa-solid fa-layer-group text-xs"></i>
+            </h3>
+            <ul class="text-[11px] text-slate-400 mt-1.5 space-y-1.5 list-disc list-inside">
+              <li><strong class="text-slate-200">TN (Twisted Nematic):</strong> Molecules twist vertically out of plane. Viewing from below aligns your eye directly with the crystal optical axis, causing severe <em>color inversion</em>.</li>
+              <li><strong class="text-slate-200">VA (Vertical Alignment):</strong> Molecules stand vertically when off. Wide angles look past the long axis, leading to gamma shift and contrast loss.</li>
+              <li><strong class="text-slate-200">IPS (In-Plane Switching):</strong> Molecules rotate <em>strictly parallel</em> to the glass substrate. The effective refractive index remains uniform at almost all viewing angles.</li>
+            </ul>
+          </div>
+
+        </div>
+
+        <!-- Key Physics Formulas / Summary -->
+        <div class="bg-blue-950/30 p-4 rounded-xl border border-blue-500/20 text-xs space-y-2">
+          <div class="font-bold text-blue-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-calculator"></i> Birefringence Retardation Equation
+          </div>
+          <div class="font-mono text-[11px] bg-slate-950/60 p-2 rounded text-center text-slate-300 border border-slate-800">
+            &Gamma;(&theta;) = (2&pi; / &lambda;) &middot; &Delta;n(&theta;) &middot; [d / cos(&theta;')]
+          </div>
+          <p class="text-[10px] text-slate-400">
+            Where &Gamma; is optical phase retardation, &Delta;n is birefringence, d is cell thickness, and &theta;' is the internal refraction angle.
+          </p>
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    /* =========================================================================
+       GLOBAL APP STATE & CONFIGURATION
+       ========================================================================= */
+    const state = {
+      activeTab: 'tab1',
+      panelType: 'TN', // 'TN', 'VA', 'IPS'
+      hAngle: 0,       // -80 to +80 deg
+      vAngle: 0,       // -60 to +60 deg
+      physicsAngle: 0, // 0 to 75 deg for Tab 2
+      physicsPanel: 'TN'
+    };
+
+    // Descriptions for panel types
+    const panelDescriptions = {
+      TN: '<strong class="text-amber-400">TN Panel (Twisted Nematic):</strong> Fastest response times but weak viewing angles. Vertical angle changes (especially looking up from below) trigger severe color inversion and luminance shift.',
+      VA: '<strong class="text-purple-400">VA Panel (Vertical Alignment):</strong> High contrast ratios facing direct center, but off-axis angles suffer from noticeable contrast reduction, image wash-out, and subtle color shift.',
+      IPS: '<strong class="text-emerald-400">IPS Panel (In-Plane Switching):</strong> Premium color consistency and wide viewing angles (up to 178°). Liquid crystals rotate parallel to the screen plane, minimizing optical path variance.'
+    };
+
+    /* =========================================================================
+       TAB SWITCHING LOGIC
+       ========================================================================= */
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      const tab1 = document.getElementById('tab1');
+      const tab2 = document.getElementById('tab2');
+      const btn1 = document.getElementById('tab1Btn');
+      const btn2 = document.getElementById('tab2Btn');
+
+      if (tabId === 'tab1') {
+        tab1.classList.remove('hidden');
+        tab1.classList.add('flex');
+        tab2.classList.add('hidden');
+        tab2.classList.remove('flex');
+        btn1.className = 'active-tab px-4 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-2';
+        btn2.className = 'px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all duration-200 flex items-center gap-2';
+        onWindowResize3D();
+      } else {
+        tab2.classList.remove('hidden');
+        tab2.classList.add('flex');
+        tab1.classList.add('hidden');
+        tab1.classList.remove('flex');
+        btn2.className = 'active-tab px-4 py-1.5 rounded-lg transition-all duration-200 flex items-center gap-2';
+        btn1.className = 'px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all duration-200 flex items-center gap-2';
+        drawPhysicsCanvas();
+      }
+    }
+
+    /* =========================================================================
+       TAB 1: THREE.JS 3D SCENE SETUP & ANIMATION
+       ========================================================================= */
+    let scene, camera, renderer, controls;
+    let monitorMesh, screenMesh, observerMesh, frustumLines, arcLine;
+    let povTextureCanvas, povContext, povTexture;
+
+    function init3DScene() {
+      const container = document.getElementById('canvas3d-container');
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+
+      // 1. Scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x070a13);
+      scene.fog = new THREE.FogExp2(0x070a13, 0.04);
+
+      // 2. Camera
+      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+      camera.position.set(0, 2.5, 7.5);
+
+      // 3. Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      // 4. Controls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI / 2 + 0.1; // Don't go far below floor
+      controls.minDistance = 3;
+      controls.maxDistance = 15;
+
+      // 5. Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      const dirLight = new THREE.DirectionalLight(0x60a5fa, 1.2);
+      dirLight.position.set(5, 8, 5);
+      dirLight.castShadow = true;
+      dirLight.shadow.mapSize.width = 1024;
+      dirLight.shadow.mapSize.height = 1024;
+      scene.add(dirLight);
+
+      const pointLight = new THREE.PointLight(0x3b82f6, 1, 10);
+      pointLight.position.set(0, 1, 2);
+      scene.add(pointLight);
+
+      // 6. Environment Floor Grid
+      const gridHelper = new THREE.GridHelper(16, 32, 0x3b82f6, 0x1e293b);
+      gridHelper.position.y = -1.5;
+      scene.add(gridHelper);
+
+      // 7. Create 3D Monitor / TV Display
+      createMonitorMesh();
+
+      // 8. Create Observer 3D Figure
+      createObserverMesh();
+
+      // 9. Arc Guide Line
+      createViewingArc();
+
+      // Window resize listener
+      window.addEventListener('resize', onWindowResize3D);
+    }
+
+    function createMonitorMesh() {
+      const monitorGroup = new THREE.Group();
+
+      // Outer Bezel / Body
+      const bezelGeo = new THREE.BoxGeometry(3.4, 2.1, 0.15);
+      const bezelMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.8 });
+      const bezel = new THREE.Mesh(bezelGeo, bezelMat);
+      bezel.castShadow = true;
+      bezel.receiveShadow = true;
+      monitorGroup.add(bezel);
+
+      // Stand Neck
+      const neckGeo = new THREE.CylinderGeometry(0.08, 0.08, 1, 16);
+      const neckMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
+      const neck = new THREE.Mesh(neckGeo, neckMat);
+      neck.position.set(0, -1, -0.1);
+      monitorGroup.add(neck);
+
+      // Stand Base
+      const baseGeo = new THREE.CylinderGeometry(0.8, 0.9, 0.08, 32);
+      const base = new THREE.Mesh(baseGeo, bezelMat);
+      base.position.set(0, -1.45, 0);
+      base.receiveShadow = true;
+      monitorGroup.add(base);
+
+      // LCD Canvas Texture setup for 3D Screen Surface
+      povTextureCanvas = document.createElement('canvas');
+      povTextureCanvas.width = 512;
+      povTextureCanvas.height = 320;
+      povContext = povTextureCanvas.getContext('2d');
+      
+      povTexture = new THREE.CanvasTexture(povTextureCanvas);
+      const screenGeo = new THREE.PlaneGeometry(3.2, 1.9);
+      const screenMat = new THREE.MeshBasicMaterial({ map: povTexture });
+      
+      screenMesh = new THREE.Mesh(screenGeo, screenMat);
+      screenMesh.position.z = 0.081; // Slightly in front of bezel
+      monitorGroup.add(screenMesh);
+
+      monitorGroup.position.set(0, 0.5, 0);
+      scene.add(monitorGroup);
+    }
+
+    function createObserverMesh() {
+      observerMesh = new THREE.Group();
+
+      // Head
+      const headGeo = new THREE.SphereGeometry(0.22, 32, 32);
+      const headMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa, roughness: 0.4 });
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.y = 0.6;
+      head.castShadow = true;
+      observerMesh.add(head);
+
+      // Torso / Body
+      const bodyGeo = new THREE.CylinderGeometry(0.25, 0.15, 0.8, 16);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = 0.1;
+      body.castShadow = true;
+      observerMesh.add(body);
+
+      // Observer Eye Marker
+      const eyeGeo = new THREE.SphereGeometry(0.06, 16, 16);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+      const eye = new THREE.Mesh(eyeGeo, eyeMat);
+      eye.position.set(0, 0.65, 0.2);
+      observerMesh.add(eye);
+
+      // Light Beam / Viewing Sightline Frustum (Line connector)
+      const lineGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0.65, 0),
+        new THREE.Vector3(0, 0, 0)
+      ]);
+      const lineMat = new THREE.LineDashedMaterial({
+        color: 0x38bdf8,
+        dashSize: 0.1,
+        gapSize: 0.05,
+        linewidth: 2
+      });
+      frustumLines = new THREE.Line(lineGeo, lineMat);
+      frustumLines.computeLineDistances();
+      scene.add(frustumLines);
+
+      scene.add(observerMesh);
+    }
+
+    function createViewingArc() {
+      const radius = 3.5;
+      const points = [];
+      for (let a = -Math.PI / 2.2; a <= Math.PI / 2.2; a += 0.05) {
+        points.push(new THREE.Vector3(radius * Math.sin(a), -0.5, radius * Math.cos(a)));
+      }
+      const arcGeo = new THREE.BufferGeometry().setFromPoints(points);
+      const arcMat = new THREE.LineBasicMaterial({ color: 0x334155, opacity: 0.5, transparent: true });
+      arcLine = new THREE.Line(arcGeo, arcMat);
+      arcLine.position.y = 0.5;
+      scene.add(arcLine);
+    }
+
+    function updateObserverPosition3D() {
+      const radius = 3.5;
+      const hRad = (state.hAngle * Math.PI) / 180;
+      const vRad = (state.vAngle * Math.PI) / 180;
+
+      // Spherical position coordinates around screen center (0, 0.5, 0)
+      const x = radius * Math.sin(hRad) * Math.cos(vRad);
+      const y = 0.5 + radius * Math.sin(vRad);
+      const z = radius * Math.cos(hRad) * Math.cos(vRad);
+
+      observerMesh.position.set(x, y, z);
+      
+      // Face toward screen center
+      observerMesh.lookAt(0, 0.5, 0);
+
+      // Update dotted sightline connector
+      if (frustumLines) {
+        const positions = frustumLines.geometry.attributes.position.array;
+        positions[0] = x;
+        positions[1] = y + 0.15;
+        positions[2] = z;
+        positions[3] = 0;
+        positions[4] = 0.5;
+        positions[5] = 0.08;
+        frustumLines.geometry.attributes.position.needsUpdate = true;
+        frustumLines.computeLineDistances();
+      }
+    }
+
+    function onWindowResize3D() {
+      const container = document.getElementById('canvas3d-container');
+      if (!container || !renderer || !camera) return;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      if (controls) controls.update();
+      if (renderer && scene && camera) {
+        renderer.render(scene, camera);
+      }
+    }
+
+    /* =========================================================================
+       POV CANVAS SIMULATOR (Renders LCD distortion based on Panel & Angles)
+       ========================================================================= */
+    // Generate a rich synthetic test artwork (portrait/landscape) on canvas
+    const sampleArtCanvas = document.createElement('canvas');
+    sampleArtCanvas.width = 400;
+    sampleArtCanvas.height = 250;
+    const sampleCtx = sampleArtCanvas.getContext('2d');
+
+    function drawSampleArtwork() {
+      // Background sky gradient
+      const grad = sampleCtx.createLinearGradient(0, 0, 0, 250);
+      grad.addColorStop(0, '#1e1b4b');
+      grad.addColorStop(0.4, '#312e81');
+      grad.addColorStop(0.7, '#e11d48');
+      grad.addColorStop(1, '#f59e0b');
+      sampleCtx.fillStyle = grad;
+      sampleCtx.fillRect(0, 0, 400, 250);
+
+      // Sun
+      sampleCtx.fillStyle = '#fef08a';
+      sampleCtx.beginPath();
+      sampleCtx.arc(200, 140, 45, 0, Math.PI * 2);
+      sampleCtx.fill();
+
+      // Mountains
+      sampleCtx.fillStyle = '#0f172a';
+      sampleCtx.beginPath();
+      sampleCtx.moveTo(0, 250);
+      sampleCtx.lineTo(90, 120);
+      sampleCtx.lineTo(180, 250);
+      sampleCtx.fill();
+
+      sampleCtx.fillStyle = '#1e293b';
+      sampleCtx.beginPath();
+      sampleCtx.moveTo(120, 250);
+      sampleCtx.lineTo(260, 90);
+      sampleCtx.lineTo(400, 250);
+      sampleCtx.fill();
+
+      // Foreground figure / face silhouette
+      sampleCtx.fillStyle = '#38bdf8';
+      sampleCtx.beginPath();
+      sampleCtx.arc(330, 180, 25, 0, Math.PI * 2);
+      sampleCtx.fill();
+
+      // Vibrant test text
+      sampleCtx.fillStyle = '#ffffff';
+      sampleCtx.font = 'bold 16px Inter, sans-serif';
+      sampleCtx.fillText('LCD VIVID TEST 4K', 20, 35);
+
+      // Color test bars at bottom
+      const colors = ['#ef4444', '#22c55e', '#3b82f6', '#eab308', '#a855f7', '#ffffff', '#000000'];
+      const barW = 400 / colors.length;
+      colors.forEach((c, i) => {
+        sampleCtx.fillStyle = c;
+        sampleCtx.fillRect(i * barW, 225, barW, 25);
+      });
+    }
+    drawSampleArtwork();
+
+    function renderPOVDisplay() {
+      const povCanvas = document.getElementById('povCanvas');
+      if (!povCanvas) return;
+      const ctx = povCanvas.getContext('2d');
+      povCanvas.width = 400;
+      povCanvas.height = 250;
+
+      const h = Math.abs(state.hAngle);
+      const v = state.vAngle; // signed: positive = looking from above, negative = looking from below
+      const absV = Math.abs(v);
+
+      let brightness = 1.0;
+      let contrast = 1.0;
+      let invert = 0; // 0 to 1
+      let gammaShift = 0;
+
+      // Model LCD Panel Behavioral Characteristics
+      if (state.panelType === 'TN') {
+        // TN Panel: Extreme sensitivity to vertical angles (especially negative/below)
+        brightness = Math.max(0.2, 1.0 - (h * 0.006) - (absV * 0.008));
+        contrast = Math.max(0.1, 1.0 - (h * 0.009) - (absV * 0.012));
+
+        if (v < -10) {
+          // Severe bottom-angle color inversion in TN
+          invert = Math.min(1.0, (Math.abs(v) - 10) / 40);
+        } else if (v > 20) {
+          // Top angle severe wash out / brightness fade
+          gammaShift = (v - 20) * 0.015;
+        }
+        if (h > 35) {
+          gammaShift += (h - 35) * 0.01;
+        }
+
+      } else if (state.panelType === 'VA') {
+        // VA Panel: Moderate contrast wash out at wide horizontal angles, minimal inversion
+        brightness = Math.max(0.5, 1.0 - (h * 0.003) - (absV * 0.004));
+        contrast = Math.max(0.25, 1.0 - (h * 0.008) - (absV * 0.006));
+        gammaShift = (h * 0.006) + (absV * 0.004);
+        invert = 0;
+
+      } else if (state.panelType === 'IPS') {
+        // IPS Panel: Excellent stability, slight off-axis glow/minor brightness reduction only
+        brightness = Math.max(0.75, 1.0 - (h * 0.002) - (absV * 0.002));
+        contrast = Math.max(0.70, 1.0 - (h * 0.003) - (absV * 0.003));
+        gammaShift = (h * 0.001);
+        invert = 0;
+      }
+
+      // Draw base artwork onto POV canvas
+      ctx.clearRect(0, 0, 400, 250);
+      ctx.drawImage(sampleArtCanvas, 0, 0, 400, 250);
+
+      // Apply pixel level LCD optical transformations
+      const imgData = ctx.getImageData(0, 0, 400, 250);
+      const data = imgData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        let r = data[i];
+        let g = data[i + 1];
+        let b = data[i + 2];
+
+        // 1. Color Inversion (TN bottom view effect)
+        if (invert > 0) {
+          r = r * (1 - invert) + (255 - r) * invert;
+          g = g * (1 - invert) + (255 - g) * invert;
+          b = b * (1 - invert) + (255 - b) * invert;
+        }
+
+        // 2. Contrast & Gamma Washout
+        if (gammaShift > 0 || contrast < 1.0) {
+          // Lift blacks / flatten gamma
+          r = ((r - 128) * contrast + 128) + (gammaShift * 80);
+          g = ((g - 128) * contrast + 128) + (gammaShift * 80);
+          b = ((b - 128) * contrast + 128) + (gammaShift * 80);
+        }
+
+        // 3. Brightness Attenuation
+        r *= brightness;
+        g *= brightness;
+        b *= brightness;
+
+        data[i] = Math.min(255, Math.max(0, r));
+        data[i + 1] = Math.min(255, Math.max(0, g));
+        data[i + 2] = Math.min(255, Math.max(0, b));
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+
+      // Copy to 3D Monitor Texture
+      if (povContext && povTexture) {
+        povContext.drawImage(povCanvas, 0, 0, 512, 320);
+        povTexture.needsUpdate = true;
+      }
+
+      // Update UI Stats & Badge
+      document.getElementById('statBrightness').innerText = `${Math.round(brightness * 100)}%`;
+      document.getElementById('statContrast').innerText = `${Math.round(contrast * 1000)}:1`;
+
+      const badge = document.getElementById('degradationBadge');
+      if (invert > 0.3) {
+        badge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30';
+        badge.innerText = 'Severe Color Inversion!';
+      } else if (contrast < 0.5 || brightness < 0.6) {
+        badge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30';
+        badge.innerText = 'High Contrast Loss';
+      } else {
+        badge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+        badge.innerText = 'Optimal Picture';
+      }
+    }
+
+    /* =========================================================================
+       TAB 2: LCD INTERNAL PHYSICS CANVAS (Interactive Micro-Structure)
+       ========================================================================= */
+    function drawPhysicsCanvas() {
+      const canvas = document.getElementById('physicsCanvas');
+      if (!canvas) return;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+
+      const ctx = canvas.getContext('2d');
+      const W = canvas.width;
+      const H = canvas.height;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Define Layer Y Boundaries
+      const layerH = H / 6;
+      const yBacklight = H - layerH;
+      const yRearPolarizer = H - layerH * 2;
+      const yLC = H - layerH * 4;
+      const yFrontPolarizer = H - layerH * 5;
+      const yViewer = 30;
+
+      // 1. Draw Layer Background Glass/Substrate Panels
+      // Backlight Layer
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.15)';
+      ctx.fillRect(40, yBacklight, W - 80, layerH - 10);
+      ctx.strokeStyle = '#3b82f6';
+      ctx.strokeRect(40, yBacklight, W - 80, layerH - 10);
+      ctx.fillStyle = '#93c5fd';
+      ctx.font = '11px Inter, sans-serif';
+      ctx.fillText('LED Backlight Unit (Unpolarized Uniform Light Source)', 55, yBacklight + 22);
+
+      // Rear Polarizer
+      ctx.fillStyle = 'rgba(147, 51, 234, 0.15)';
+      ctx.fillRect(40, yRearPolarizer, W - 80, layerH - 10);
+      ctx.strokeStyle = '#a855f7';
+      ctx.strokeRect(40, yRearPolarizer, W - 80, layerH - 10);
+      ctx.fillStyle = '#c084fc';
+      ctx.fillText('Rear Polarizing Filter (0° Transmission Axis)', 55, yRearPolarizer + 22);
+
+      // Liquid Crystal Layer Container
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+      ctx.fillRect(40, yLC, W - 80, layerH * 2 - 10);
+      ctx.strokeStyle = '#64748b';
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(40, yLC, W - 80, layerH * 2 - 10);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillText(`Liquid Crystal Layer (${state.physicsPanel} Mode Alignment)`, 55, yLC + 20);
+
+      // Front Polarizer
+      ctx.fillStyle = 'rgba(147, 51, 234, 0.15)';
+      ctx.fillRect(40, yFrontPolarizer, W - 80, layerH - 10);
+      ctx.strokeStyle = '#a855f7';
+      ctx.strokeRect(40, yFrontPolarizer, W - 80, layerH - 10);
+      ctx.fillStyle = '#c084fc';
+      ctx.fillText('Front Polarizing Filter (90° Crossed Axis)', 55, yFrontPolarizer + 22);
+
+      // 2. Draw Liquid Crystal Molecules (Ellipses / Rods)
+      const lcCenterX = W / 2;
+      const lcCenterY = yLC + layerH - 5;
+      const rows = 3;
+      const cols = 9;
+      const spacingX = (W - 200) / cols;
+
+      ctx.save();
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const mx = 100 + c * spacingX;
+          const my = yLC + 35 + r * 30;
+
+          // Calculate molecule tilt angle based on Panel Type & Layer Depth
+          let molAngle = 0; // radians
+          if (state.physicsPanel === 'TN') {
+            // Twisted 90 degrees from bottom to top
+            molAngle = (r / (rows - 1)) * (Math.PI / 2);
+          } else if (state.physicsPanel === 'VA') {
+            // Stand nearly vertical (homeotropic) when off / ON tilt
+            molAngle = Math.PI / 2 - 0.15;
+          } else if (state.physicsPanel === 'IPS') {
+            // Rotate strictly in-plane (parallel to glass)
+            molAngle = 0.1;
+          }
+
+          // Draw Rod / Ellipse
+          ctx.save();
+          ctx.translate(mx, my);
+          ctx.rotate(molAngle);
+          
+          ctx.fillStyle = '#38bdf8';
+          ctx.strokeStyle = '#0284c7';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 18, 5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          // Optical axis indicator line
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(-12, 0);
+          ctx.lineTo(12, 0);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+      ctx.restore();
+
+      // 3. Draw Light Ray Tracing & Birefringence Path
+      const rayAngleRad = (state.physicsAngle * Math.PI) / 180;
+      const startX = W / 2;
+      const dx = Math.tan(rayAngleRad) * (yBacklight - yViewer);
+      const endX = startX + dx;
+
+      // Draw Incident Ray from Backlight up to Viewer
+      ctx.lineWidth = 3;
+      ctx.setLineDash([]);
+      
+      // Ray Color depends on phase retardation leakage
+      const phaseError = Math.sin(rayAngleRad * 1.5) * (state.physicsPanel === 'TN' ? 1.0 : state.physicsPanel === 'VA' ? 0.7 : 0.25);
+      const rayColor = phaseError > 0.4 ? `rgba(244, 63, 94, ${0.4 + phaseError * 0.5})` : '#38bdf8';
+
+      ctx.strokeStyle = rayColor;
+      ctx.beginPath();
+      ctx.moveTo(startX, yBacklight + 20);
+      ctx.lineTo(startX, yRearPolarizer + 15);
+      
+      // Diagonal passage through Liquid Crystal anisotropic medium
+      ctx.lineTo(startX + Math.tan(rayAngleRad) * (yRearPolarizer - yLC), yLC);
+      ctx.lineTo(endX, yFrontPolarizer);
+      ctx.lineTo(endX, yViewer);
+      ctx.stroke();
+
+      // Draw Wave Vectors / Polarization E-field Vibrations along Ray
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#f43f5e';
+      const steps = 12;
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const rx = startX + dx * t;
+        const ry = (yBacklight + 20) - (yBacklight + 20 - yViewer) * t;
+
+        // Draw transverse E-field oscillation ticks
+        const perpAngle = rayAngleRad + Math.PI / 2;
+        const waveAmp = 10 * Math.cos(i * 1.2 + (state.physicsAngle * 0.1));
+        
+        ctx.beginPath();
+        ctx.moveTo(rx - Math.cos(perpAngle) * waveAmp, ry - Math.sin(perpAngle) * waveAmp);
+        ctx.lineTo(rx + Math.cos(perpAngle) * waveAmp, ry + Math.sin(perpAngle) * waveAmp);
+        ctx.stroke();
+      }
+
+      // 4. Observer Eye Icon at end of Ray
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(endX, yViewer - 10, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(endX, yViewer - 10, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = 'bold 12px Inter, sans-serif';
+      ctx.fillText(`Observer Eye (&theta; = ${state.physicsAngle}°)`, endX + 18, yViewer - 6);
+
+      // Phase Retardation Annotations
+      if (state.physicsAngle > 20) {
+        ctx.fillStyle = '#f43f5e';
+        ctx.font = '11px Inter, sans-serif';
+        ctx.fillText(`Oblique Birefringence Shift: +${Math.round(phaseError * 180)}° Phase Error`, endX - 160, yFrontPolarizer - 12);
+      }
+    }
+
+    /* =========================================================================
+       EVENT LISTENERS & CONTROLS BINDING
+       ========================================================================= */
+    function setPanelType(type) {
+      state.panelType = type;
+      
+      // Update button styling
+      document.querySelectorAll('.panel-btn').forEach(btn => {
+        btn.className = 'panel-btn py-2 px-1 text-center rounded-xl border border-slate-800 bg-slate-900/60 text-slate-400 font-medium text-xs hover:border-slate-700 transition';
+      });
+      const activeBtn = document.getElementById(`panelBtn-${type}`);
+      if (activeBtn) {
+        activeBtn.className = 'panel-btn py-2 px-1 text-center rounded-xl border border-blue-500 bg-blue-600/20 text-white font-medium text-xs transition';
+      }
+
+      // Update description text
+      document.getElementById('panelDescription').innerHTML = panelDescriptions[type];
+
+      // Re-render POV output
+      renderPOVDisplay();
+    }
+
+    function setPhysicsPanel(type) {
+      state.physicsPanel = type;
+      ['TN', 'VA', 'IPS'].forEach(p => {
+        const btn = document.getElementById(`physBtn-${p}`);
+        if (p === type) {
+          btn.className = 'text-xs px-3 py-1 rounded-lg border border-purple-500 bg-purple-600/30 text-white font-medium';
+        } else {
+          btn.className = 'text-xs px-3 py-1 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 font-medium';
+        }
+      });
+      drawPhysicsCanvas();
+    }
+
+    function presetAngle(h, v) {
+      state.hAngle = h;
+      state.vAngle = v;
+      document.getElementById('hAngle').value = h;
+      document.getElementById('vAngle').value = v;
+      document.getElementById('hAngleVal').innerText = `${h}°`;
+      document.getElementById('vAngleVal').innerText = `${v}°`;
+      updateObserverPosition3D();
+      renderPOVDisplay();
+    }
+
+    // Init UI Listeners
+    window.addEventListener('DOMContentLoaded', () => {
+      // Sliders
+      const hSlider = document.getElementById('hAngle');
+      const vSlider = document.getElementById('vAngle');
+      const physSlider = document.getElementById('physicsAngle');
+
+      hSlider.addEventListener('input', (e) => {
+        state.hAngle = parseInt(e.target.value);
+        document.getElementById('hAngleVal').innerText = `${state.hAngle}°`;
+        updateObserverPosition3D();
+        renderPOVDisplay();
+      });
+
+      vSlider.addEventListener('input', (e) => {
+        state.vAngle = parseInt(e.target.value);
+        document.getElementById('vAngleVal').innerText = `${state.vAngle}°`;
+        updateObserverPosition3D();
+        renderPOVDisplay();
+      });
+
+      physSlider.addEventListener('input', (e) => {
+        state.physicsAngle = parseInt(e.target.value);
+        document.getElementById('physicsAngleVal').innerText = `${state.physicsAngle}°`;
+        drawPhysicsCanvas();
+      });
+
+      // Window Resize for Tab 2 Canvas
+      window.addEventListener('resize', () => {
+        if (state.activeTab === 'tab2') {
+          drawPhysicsCanvas();
+        }
+      });
+
+      // Initialize Three.js 3D View
+      init3DScene();
+      updateObserverPosition3D();
+      renderPOVDisplay();
+      animate3D();
+    });
+  </script>
+</body>
+</html>
