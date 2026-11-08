@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liquid Crystal Molecular Arrangement & Steady Director Vector</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    #ui-panel {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 10;
+      width: 350px;
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #38bdf8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    h2 {
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: #94a3b8;
+      margin-bottom: 16px;
+    }
+    .control-group {
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+    select, input[type="range"] {
+      width: 100%;
+      padding: 8px 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #f8fafc;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    select:focus {
+      border-color: #38bdf8;
+    }
+    input[type="range"] {
+      padding: 0;
+      height: 6px;
+      appearance: none;
+      background: #334155;
+      border-radius: 3px;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+    }
+    .info-card {
+      background: rgba(15, 23, 42, 0.6);
+      border-left: 3px solid #38bdf8;
+      padding: 10px 12px;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.78rem;
+      line-height: 1.4;
+      color: #94a3b8;
+      margin-top: 16px;
+    }
+    .info-card strong {
+      color: #f8fafc;
+    }
+    #director-stats {
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: #4ade80;
+      background: rgba(15, 23, 42, 0.8);
+      padding: 8px;
+      border-radius: 6px;
+    }
+    .legend {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+      font-size: 0.75rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .legend-color {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+    }
+  </style>
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="ui-panel">
+    <h1>Liquid Crystal Director</h1>
+    <h2>Molecular Arrangement Visualizer</h2>
+
+    <div class="control-group">
+      <label for="phase-select">Mesophase / State</label>
+      <select id="phase-select">
+        <option value="isotropic">Isotropic (Random)</option>
+        <option value="nematic" selected>Nematic (Orientational Order)</option>
+        <option value="smecticA">Smectic A (Layered Normal)</option>
+        <option value="smecticB">Smectic B (Hexagonal Lattice Layers)</option>
+        <option value="smecticC">Smectic C (Layered Tilted)</option>
+        <option value="cholesteric">Chiral Nematic / Cholesteric (Helical)</option>
+        <option value="columnar">Columnar / Discotic (Stacked Columns)</option>
+      </select>
+    </div>
+
+    <div class="control-group">
+      <label for="order-slider">Order Parameter (S): <span id="order-val">0.85</span></label>
+      <input type="range" id="order-slider" min="0" max="1" step="0.05" value="0.85">
+    </div>
+
+    <div class="control-group">
+      <label for="field-slider">External Field (&vec;E)</label>
+      <input type="range" id="field-slider" min="0" max="1" step="0.05" value="0">
+    </div>
+
+    <div class="info-card" id="info-text">
+      <strong>Nematic Phase:</strong> Molecules fluctuate thermally around a constant director unit vector n̂, maintaining orientational order without positional lattices.
+    </div>
+
+    <div id="director-stats">Director n̂ = 0.00î + 1.00ĵ + 0.00k̂</div>
+
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-color" style="background: #38bdf8;"></div>
+        <span>Molecules</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #ef4444;"></div>
+        <span>Constant Director (n̂)</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Scene Setup ---
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0f172a);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 25);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // --- Lighting ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight1.position.set(10, 20, 15);
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.3);
+    dirLight2.position.set(-10, -10, -10);
+    scene.add(dirLight2);
+
+    // --- Grid ---
+    const gridHelper = new THREE.GridHelper(30, 30, 0x334155, 0x1e293b);
+    gridHelper.position.y = -8;
+    scene.add(gridHelper);
+
+    // --- Molecule Class & Initialization ---
+    const NUM_MOLECULES = 360; 
+    const molecules = [];
+    const moleculeGroup = new THREE.Group();
+    scene.add(moleculeGroup);
+
+    const MOL_RADIUS = 0.22;
+    const MOL_LENGTH = 1.6;
+    const molGeometry = new THREE.CylinderGeometry(MOL_RADIUS, MOL_RADIUS, MOL_LENGTH, 16);
+    const capGeo = new THREE.SphereGeometry(MOL_RADIUS, 16, 16);
+    
+    const baseMaterial = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.1 });
+    const topCapMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.3, metalness: 0.1 });
+    const botCapMat = new THREE.MeshStandardMaterial({ color: 0x0369a1, roughness: 0.3, metalness: 0.1 });
+
+    function createMoleculeMesh() {
+      const group = new THREE.Group();
+      const cylinder = new THREE.Mesh(molGeometry, baseMaterial);
+      group.add(cylinder);
+
+      const topCap = new THREE.Mesh(capGeo, topCapMat);
+      topCap.position.y = MOL_LENGTH / 2;
+      group.add(topCap);
+
+      const botCap = new THREE.Mesh(capGeo, botCapMat);
+      botCap.position.y = -MOL_LENGTH / 2;
+      group.add(botCap);
+
+      return group;
+    }
+
+    const BOUNDS = { x: 12, y: 12, z: 12 };
+    
+    for (let i = 0; i < NUM_MOLECULES; i++) {
+      const mesh = createMoleculeMesh();
+      const pos = new THREE.Vector3(
+        (Math.random() - 0.5) * BOUNDS.x,
+        (Math.random() - 0.5) * BOUNDS.y,
+        (Math.random() - 0.5) * BOUNDS.z
+      );
+
+      mesh.position.copy(pos);
+      moleculeGroup.add(mesh);
+
+      // Pre-calculate hexagonal lattice grid coordinates for Smectic B & Columnar
+      const layerIdx = i % 4; 
+      const gridIdx = Math.floor(i / 4);
+      const cols = 10;
+      const r = Math.floor(gridIdx / cols);
+      const c = gridIdx % cols;
+      const hexSpacingX = 1.2;
+      const hexSpacingZ = 1.04; 
+      
+      const hexX = (c - cols / 2) * hexSpacingX + ((r % 2) * hexSpacingX * 0.5);
+      const hexZ = (r - 4) * hexSpacingZ;
+      const hexY = (layerIdx - 1.5) * 3.0;
+
+      // Columnar specific layout: columns running along Y axis
+      const colHeightIdx = i % 9; // 9 molecules per column
+      const colGridIdx = Math.floor(i / 9);
+      const colCols = 6;
+      const cr = Math.floor(colGridIdx / colCols);
+      const cc = colGridIdx % colCols;
+      const colX = (cc - colCols / 2) * 1.8 + ((cr % 2) * 0.9);
+      const colZ = (cr - 2) * 1.6;
+      const colY = (colHeightIdx - 4) * 1.4;
+
+      molecules.push({
+        mesh: mesh,
+        basePos: pos.clone(),
+        hexPos: new THREE.Vector3(hexX, hexY, hexZ),
+        colPos: new THREE.Vector3(colX, colY, colZ),
+        polarOffset: (Math.random() - 0.5) * Math.PI * 2,
+        aziOffset: Math.random() * Math.PI * 2,
+        rotSpeed: 2.0 + Math.random() * 4.0,
+        precessionSpeed: 0.5 + Math.random() * 1.5
+      });
+    }
+
+    // --- Macroscopic Fixed Director Vector ---
+    const macroDirector = new THREE.Vector3(0, 1, 0);
+
+    const directorArrow = new THREE.ArrowHelper(
+      macroDirector,
+      new THREE.Vector3(0, 0, 0),
+      9,
+      0xef4444,
+      1.5,
+      0.8
+    );
+    directorArrow.line.material.linewidth = 4;
+    scene.add(directorArrow);
+
+    // --- State & UI Logic ---
+    const phaseSelect = document.getElementById('phase-select');
+    const orderSlider = document.getElementById('order-slider');
+    const orderValDisplay = document.getElementById('order-val');
+    const fieldSlider = document.getElementById('field-slider');
+    const infoText = document.getElementById('info-text');
+    const directorStats = document.getElementById('director-stats');
+
+    const descriptions = {
+      isotropic: "<strong>Isotropic Phase:</strong> High thermal energy destroys orientational order (S ≈ 0). No net macroscopic director vector exists.",
+      nematic: "<strong>Nematic Phase:</strong> Molecules fluctuate thermally around a constant director unit vector n̂.",
+      smecticA: "<strong>Smectic A Phase:</strong> Layered positional structure. The constant director n̂ is aligned normal (perpendicular) to the layers.",
+      smecticB: "<strong>Smectic B Phase:</strong> Layered structure with <strong>hexagonal close-packed positional order</strong> within each layer.",
+      smecticC: "<strong>Smectic C Phase:</strong> Layered structure where the constant director n̂ is tilted at a constant equilibrium angle relative to layer normals.",
+      cholesteric: "<strong>Chiral Nematic (Cholesteric):</strong> Molecules align in thin planes; director rotates steadily along the helical axis.",
+      columnar: "<strong>Columnar (Discotic) Phase:</strong> Disk-like molecules stack on top of each other into columns, forming a 2D lattice. The director n̂ aligns with the column axes."
+    };
+
+    let currentPhase = 'nematic';
+    let orderParameter = 0.85;
+    let electricField = 0;
+
+    orderSlider.addEventListener('input', (e) => {
+      orderParameter = parseFloat(e.target.value);
+      orderValDisplay.textContent = orderParameter.toFixed(2);
+    });
+
+    fieldSlider.addEventListener('input', (e) => {
+      electricField = parseFloat(e.target.value);
+    });
+
+    phaseSelect.addEventListener('change', (e) => {
+      currentPhase = e.target.value;
+      infoText.innerHTML = descriptions[currentPhase];
+    });
+
+    // Main animation & updating logic
+    function updateState(time) {
+      // 1. Calculate the CONSTANT Macroscopic Director based on Phase & Field
+      let targetDirector = new THREE.Vector3(0, 1, 0);
+
+      if (currentPhase === 'smecticC') {
+        const tiltAngle = Math.PI / 6; 
+        targetDirector.set(Math.sin(tiltAngle), Math.cos(tiltAngle), 0).normalize();
+      }
+
+      if (electricField > 0 && currentPhase !== 'isotropic') {
+        const eFieldDir = new THREE.Vector3(0, 0, 1);
+        targetDirector.lerp(eFieldDir, electricField).normalize();
+      }
+
+      macroDirector.copy(targetDirector);
+
+      // Update UI & Visual Vector Representation
+      if (currentPhase === 'isotropic') {
+        directorArrow.visible = false;
+        directorStats.textContent = "Director n̂: Undefined (S ≈ 0)";
+      } else {
+        directorArrow.visible = true;
+        directorArrow.setDirection(macroDirector);
+        directorArrow.setLength(8, 1.2, 0.6);
+
+        const i = macroDirector.x.toFixed(2);
+        const j = macroDirector.y.toFixed(2);
+        const k = macroDirector.z.toFixed(2);
+        directorStats.textContent = `Director n̂ = ${i}î + ${j}ĵ + ${k}k̂`;
+      }
+
+      // 2. Update individual molecules
+      molecules.forEach((mol) => {
+        let localDir = macroDirector.clone();
+        let targetPos = mol.basePos.clone();
+        let targetScale = new THREE.Vector3(1, 1, 1);
+
+        if (currentPhase === 'isotropic') {
+          const theta = mol.polarOffset + time * mol.precessionSpeed;
+          const phi = mol.aziOffset + time * mol.rotSpeed;
+          localDir.set(
+            Math.sin(theta) * Math.cos(phi),
+            Math.cos(theta),
+            Math.sin(theta) * Math.sin(phi)
+          ).normalize();
+
+        } else if (currentPhase === 'cholesteric') {
+          const helixPitch = 0.4;
+          const layerAngle = mol.basePos.y * helixPitch;
+          localDir.set(Math.cos(layerAngle), 0, Math.sin(layerAngle)).normalize();
+
+          const maxThermalAngle = (1 - orderParameter) * (Math.PI / 3);
+          const thermalPhase = time * mol.precessionSpeed + mol.polarOffset;
+          localDir.x += Math.sin(thermalPhase) * maxThermalAngle;
+          localDir.z += Math.cos(thermalPhase) * maxThermalAngle;
+          localDir.normalize();
+
+        } else if (currentPhase === 'smecticB') {
+          targetPos.copy(mol.hexPos);
+          targetPos.x += Math.sin(time * 3 + mol.polarOffset) * 0.08;
+          targetPos.z += Math.cos(time * 3 + mol.aziOffset) * 0.08;
+
+          const coneAngle = (1 - orderParameter) * (Math.PI / 6);
+          const precAngle = time * mol.precessionSpeed + mol.polarOffset;
+          localDir.x += Math.cos(precAngle) * Math.sin(coneAngle);
+          localDir.z += Math.sin(precAngle) * Math.sin(coneAngle);
+          localDir.normalize();
+
+        } else if (currentPhase === 'columnar') {
+          // Discotic molecules stack into columns (puck shape)
+          targetPos.copy(mol.colPos);
+          targetPos.x += Math.sin(time * 2 + mol.polarOffset) * 0.05;
+          targetPos.z += Math.cos(time * 2 + mol.aziOffset) * 0.05;
+
+          // Scale down height to look like flat discs/pucks
+          targetScale.set(1.6, 0.25, 1.6);
+
+          // Discs lie perpendicular to the column axis (Y)
+          localDir.set(0, 1, 0);
+
+        } else {
+          if (currentPhase.startsWith('smectic')) {
+            const layerY = Math.round(mol.basePos.y / 2.5) * 2.5;
+            targetPos.y = layerY;
+          }
+
+          const coneAngle = (1 - orderParameter) * (Math.PI / 2);
+          const precAngle = time * mol.precessionSpeed + mol.polarOffset;
+          
+          const orthVector = new THREE.Vector3(1, 0, 0);
+          if (Math.abs(macroDirector.x) > 0.9) orthVector.set(0, 1, 0);
+          
+          const v1 = new THREE.Vector3().crossVectors(macroDirector, orthVector).normalize();
+          const v2 = new THREE.Vector3().crossVectors(macroDirector, v1).normalize();
+
+          const deltaX = Math.cos(precAngle) * Math.sin(coneAngle);
+          const deltaY = Math.sin(precAngle) * Math.sin(coneAngle);
+
+          localDir.addScaledVector(v1, deltaX);
+          localDir.addScaledVector(v2, deltaY);
+          localDir.normalize();
+        }
+
+        // Apply position and scale smoothing
+        mol.mesh.position.lerp(targetPos, 0.08);
+        mol.mesh.scale.lerp(targetScale, 0.1);
+
+        // Molecule self-rotation & alignment to local vector
+        const up = new THREE.Vector3(0, 1, 0);
+        const alignQuat = new THREE.Quaternion().setFromUnitVectors(up, localDir);
+        
+        const spinQuat = new THREE.Quaternion().setFromAxisAngle(
+          localDir, 
+          mol.aziOffset + time * mol.rotSpeed
+        );
+
+        const finalQuat = spinQuat.multiply(alignQuat);
+        mol.mesh.quaternion.slerp(finalQuat, 0.15);
+      });
+    }
+
+    // --- Animation Loop ---
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const time = clock.getElapsedTime();
+
+      updateState(time);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Window Resizing Handling
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+  </script>
+</body>
+</html>
