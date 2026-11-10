@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D LCD Physics Visualizer - Interactive Seminar Aid</title>
+    <!-- Tailwind CSS for modern glassmorphism styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js for 3D rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- OrbitControls for full rotatable 3D view -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- GSAP for smooth layer animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: radial-gradient(circle at center, #182234 0%, #0b0f19 100%);
+            color: #e2e8f0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Glassmorphism Panel Styling */
+        .hud-panel {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.7), inset 0 0 15px rgba(56, 189, 248, 0.05);
+        }
+
+        .hud-panel-active {
+            border-color: rgba(56, 189, 248, 0.8);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3), inset 0 0 20px rgba(56, 189, 248, 0.1);
+        }
+
+        /* Glowing text & borders */
+        .glow-cyan {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+        }
+        
+        .glow-amber {
+            text-shadow: 0 0 10px rgba(255, 170, 0, 0.7);
+        }
+
+        /* Custom Scrollbar for HUD panels */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(5, 10, 20, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 240, 255, 0.4);
+            border-radius: 2px;
+        }
+
+        /* Canvas Overlay Canvas CSS */
+        #webgl-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .interactive {
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen">
+
+    <!-- 3D Canvas Rendering Container -->
+    <div id="webgl-container"></div>
+
+    <!-- UI Overlay Layer -->
+    <div id="ui-layer" class="flex flex-col justify-between p-4 md:p-6">
+        
+        <!-- TOP HUD BAR: Header & Mode Tabs -->
+        <header class="flex flex-col md:flex-row justify-between items-center gap-4 interactive">
+            <!-- Title Card -->
+            <div class="hud-panel px-5 py-3 rounded-xl flex items-center gap-3">
+                <div class="w-3 h-8 bg-cyan-400 rounded-full shadow-[0_0_12px_#00f0ff]"></div>
+                <div>
+                    <h1 class="font-orbitron font-bold text-lg md:text-xl tracking-wider text-cyan-300">
+                        LCD PHYSICS <span class="text-xs px-2 py-0.5 rounded bg-cyan-950 border border-cyan-500/40 text-cyan-400">3D VISUALIZER</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 tracking-wide">Twisted Nematic (TN) Liquid Crystal Optics</p>
+                </div>
+            </div>
+
+            <!-- Mode Selector Tabs -->
+            <div class="hud-panel p-1.5 rounded-xl flex gap-1 md:gap-2">
+                <button id="tab-off" onclick="setMode('OFF')" 
+                        class="px-4 py-2 rounded-lg text-xs md:text-sm font-semibold font-orbitron transition-all duration-300 flex items-center gap-2 bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
+                    <i class="fa-solid fa-bolt-slash text-slate-400"></i>
+                    <span>NO VOLTAGE (OFF)</span>
+                </button>
+
+                <button id="tab-on" onclick="setMode('ON')" 
+                        class="px-4 py-2 rounded-lg text-xs md:text-sm font-semibold font-orbitron transition-all duration-300 flex items-center gap-2 text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10">
+                    <i class="fa-solid fa-bolt text-amber-400"></i>
+                    <span>APPLIED VOLTAGE (ON)</span>
+                </button>
+
+                <button id="tab-exploded" onclick="setMode('EXPLODED')" 
+                        class="px-4 py-2 rounded-lg text-xs md:text-sm font-semibold font-orbitron transition-all duration-300 flex items-center gap-2 text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10">
+                    <i class="fa-solid fa-layer-group text-purple-400"></i>
+                    <span>EXPLODED ASSEMBLY VIEW</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- CENTER HUD: Dynamic Physics Info Overlay & Component Inspection -->
+        <main class="flex-1 my-4 flex flex-col md:flex-row justify-between items-end pointer-events-none">
+            
+            <!-- Component Direct Inspection Bar (Visible in EXPLODED Mode) -->
+            <div id="component-nav" class="hud-panel p-3 rounded-xl flex flex-col gap-2 max-h-[60vh] overflow-y-auto interactive opacity-0 transition-all duration-500 transform translate-x-[-20px] pointer-events-auto">
+                <div class="text-xs font-orbitron font-bold text-cyan-400 mb-1 border-b border-cyan-500/30 pb-1 flex items-center justify-between">
+                    <span>EXPLODED LAYERS</span>
+                    <i class="fa-solid fa-microscope text-xs"></i>
+                </div>
+                <button onclick="inspectComponent(0)" class="comp-btn px-3 py-1.5 rounded text-left text-xs font-mono border border-cyan-500/40 hover:border-cyan-400 transition-all text-cyan-300 hover:bg-cyan-950/40">1. Rear Polarizer (0° Vertical)</button>
+                <button onclick="inspectComponent(1)" class="comp-btn px-3 py-1.5 rounded text-left text-xs font-mono border border-slate-700/50 hover:border-cyan-400 transition-all text-slate-300 hover:bg-cyan-950/40">2. Rear Glass Substrate</button>
+                <button onclick="inspectComponent(2)" class="comp-btn px-3 py-1.5 rounded text-left text-xs font-mono border border-amber-500/40 hover:border-amber-400 transition-all text-amber-300 hover:bg-amber-950/40">3. Conductive SnO₂ Layer</button>
+                <button onclick="inspectComponent(3)" class="comp-btn px-3 py-1.5 rounded text-left text-xs font-mono border border-slate-700/50 hover:border-cyan-400 transition-all text-slate-300 hover:bg-cyan-950/40">4. Twisted Nematic LC Layer</button>
+                <button onclick="inspectComponent(4)" class="comp-btn px-3 py-1.5 rounded text-left text-xs font-mono border border-amber-500/40 hover:border-amber-400 transition-all text-amber-300 hover:bg-amber-950/40">5. Front SnO₂ Layer</button>
+                <button onclick="inspectComponent(5)" class="comp-btn px-3 py-1.5 rounded text-left text-xs font-mono border border-slate-700/50 hover:border-cyan-400 transition-all text-slate-300 hover:bg-cyan-950/40">6. Front Glass Substrate</button>
+                <button onclick="inspectComponent(6)" class="comp-btn px-3 py-1.5 rounded text-left text-xs font-mono border border-fuchsia-500/40 hover:border-fuchsia-400 transition-all text-fuchsia-300 hover:bg-fuchsia-950/40">7. Front Polarizer (90° Horizontal)</button>
+                
+                <button onclick="resetExplodedView()" class="mt-2 px-3 py-1 rounded text-center text-xs font-orbitron bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/40">
+                    <i class="fa-solid fa-arrows-to-eye mr-1"></i> RESET FOCUS
+                </button>
+            </div>
+
+            <!-- Detailed Explanation Card -->
+            <div id="info-card" class="hud-panel p-5 rounded-xl max-w-md w-full interactive transition-all duration-300">
+                <div class="flex justify-between items-start mb-2 border-b border-cyan-500/30 pb-2">
+                    <div>
+                        <span id="info-tag" class="text-[10px] font-orbitron font-semibold uppercase px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                            STATE: NO VOLTAGE (V = 0)
+                        </span>
+                        <h2 id="info-title" class="font-orbitron font-bold text-lg text-white mt-1">Light Transmitting (Pixel Bright)</h2>
+                    </div>
+                    <div id="status-icon" class="w-8 h-8 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-300">
+                        <i class="fa-solid fa-lightbulb"></i>
+                    </div>
+                </div>
+                
+                <p id="info-body" class="text-xs md:text-sm text-slate-300 leading-relaxed font-sans mb-3">
+                    Without an electric field, liquid crystal molecules naturally arrange in a continuous 90° helical twist between alignment layers. Backlight polarized at 0° by the rear filter follows this molecular twist and rotates 90°, matching the orientation of the front crossed polarizer and allowing light to pass freely.
+                </p>
+
+                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-[11px] font-mono">
+                    <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                        <span class="text-slate-400 block">LC Helix Twist:</span>
+                        <span id="metric-twist" class="text-cyan-400 font-bold">90° Helical Alignment</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-2 rounded border border-slate-700">
+                        <span class="text-slate-400 block">Light Output:</span>
+                        <span id="metric-light" class="text-emerald-400 font-bold">100% Transmission</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- BOTTOM HUD BAR: Real Display Output Preview & Controls Hint -->
+        <footer class="flex flex-col md:flex-row items-center justify-between gap-4 interactive">
+            
+            <!-- Instructions / Controls -->
+            <div class="hud-panel px-4 py-2 rounded-xl text-xs text-slate-300 flex items-center gap-4">
+                <span class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-mouse-pointer text-cyan-400"></i> Drag to Rotate 3D
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-magnifying-glass text-cyan-400"></i> Scroll to Zoom
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-hand-pointer text-cyan-400"></i> Click Layer in Exploded View
+                </span>
+            </div>
+
+            <!-- Real Display Pixel Output Preview Panel -->
+            <div class="hud-panel p-3 rounded-xl flex items-center gap-4 border border-cyan-500/30">
+                <div class="text-right">
+                    <div class="text-[10px] font-orbitron tracking-widest text-slate-400 uppercase">MACRO PIXEL OUTPUT</div>
+                    <div id="pixel-status-text" class="text-xs font-bold font-mono text-cyan-300">BRIGHT STATE (LIGHT ON)</div>
+                </div>
+
+                <!-- Live Subpixel Graphic Container -->
+                <div class="relative w-12 h-12 rounded-lg bg-black p-1 border border-slate-700 flex items-center justify-center overflow-hidden shadow-inner">
+                    <div id="pixel-glow" class="absolute inset-0 bg-cyan-400/80 blur-sm transition-all duration-500"></div>
+                    <div id="pixel-display-surface" class="relative z-10 w-full h-full rounded flex items-center justify-center border border-white bg-white transition-all duration-500 shadow-[0_0_15px_#ffffff]">
+                        <span id="pixel-icon" class="text-xs font-bold text-slate-900 font-mono">ON</span>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- MAIN THREE.JS APPLICATION LOGIC -->
+    <script>
+        // --- GLOBAL VARIABLES & STATE MANAGEMENT ---
+        let scene, camera, renderer, controls;
+        let currentMode = 'OFF'; // 'OFF', 'ON', 'EXPLODED'
+        let explodedIndex = -1; // -1 means viewing all layers expanded
+
+        // Component Group Holders
+        const layersGroup = new THREE.Group();
+        const lightBeamsGroup = new THREE.Group();
+        const lcMolecules = [];
+        const layerMeshes = [];
+
+        // Dynamic Materials
+        let lightBeamMaterial, frontPolarizerMat, rearPolarizerMat, lcMoleculeMat;
+        let waveCurveMesh;
+
+        // Constants for layout positioning
+        const COMPONENT_DATA = [
+            { id: 0, name: "Rear Polarizer Filter (0°)", targetZ: -10.5, color: 0x3b82f6, desc: "Absorbs unpolarized light waves vibrating in all directions except 0° (vertical axis), outputting linearly polarized light." },
+            { id: 1, name: "Rear Substrate Glass", targetZ: -7.0, color: 0x94a3b8, desc: "Provides rigid structural support and seals liquid crystal fluid. Coated on the inner surface with micro-grooved alignment film." },
+            { id: 2, name: "Rear SnO₂ Conductive Electrode", targetZ: -3.5, color: 0xeab308, desc: "Transparent tin oxide (SnO₂) conductive thin film layer acting as lower electrical contact for driving electric fields." },
+            { id: 3, name: "Twisted Nematic (TN) Liquid Crystal", targetZ: 0.0, color: 0x38bdf8, desc: "Elongated rod-like organic molecules possessing optical anisotropy. Naturally twist 90° across the cell gap without voltage." },
+            { id: 4, name: "Front SnO₂ Conductive Electrode", targetZ: 3.5, color: 0xeab308, desc: "Patterned transparent conductive oxide layer forming segment/pixel matrix electrodes to apply selective driving voltage." },
+            { id: 5, name: "Front Substrate Glass", targetZ: 7.0, color: 0x94a3b8, desc: "Outer protective glass substrate carrying top electrode grid and rubbed alignment layer perpendicular to rear glass." },
+            { id: 6, name: "Front Polarizer Filter (90°)", targetZ: 10.5, color: 0xd946ef, desc: "Oriented at 90° (horizontal) relative to rear polarizer. Blocks unrotated light (OFF state) or passes rotated light (ON state)." }
+        ];
+
+        // --- INITIALIZATION ---
+        window.onload = function () {
+            initThreeJS();
+            createLCDComponents();
+            createLightWaveVisualization();
+            setupEventListeners();
+            animate();
+            
+            // Set initial UI State
+            setMode('OFF');
+        };
+
+        function initThreeJS() {
+            const container = document.getElementById('webgl-container');
+
+            // 1. Scene Setup
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x0b0f19, 0.015);
+
+            // 2. Camera Setup
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(22, 14, 28);
+
+            // 3. Renderer Setup
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.3;
+            container.appendChild(renderer.domElement);
+
+            // 4. OrbitControls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 60;
+            controls.minDistance = 5;
+            controls.target.set(0, 0, 0);
+
+            // 5. High-Contrast Studio Lighting Setup
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            scene.add(ambientLight);
+
+            const mainDirLight = new THREE.DirectionalLight(0xffffff, 2.0);
+            mainDirLight.position.set(15, 25, 20);
+            mainDirLight.castShadow = true;
+            scene.add(mainDirLight);
+
+            const cyanRimLight = new THREE.PointLight(0x00f0ff, 4, 50);
+            cyanRimLight.position.set(-20, -10, -10);
+            scene.add(cyanRimLight);
+
+            const magentaFillLight = new THREE.PointLight(0xe0e7ff, 3, 50);
+            magentaFillLight.position.set(20, -10, 15);
+            scene.add(magentaFillLight);
+
+            scene.add(layersGroup);
+            scene.add(lightBeamsGroup);
+        }
+
+        // --- EVENT LISTENERS & INTERACTION HANDLERS ---
+        function setupEventListeners() {
+            // Window resize handler
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Raycasting for direct 3D component clicking
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            renderer.domElement.addEventListener('click', (event) => {
+                // Only allow click selection when in EXPLODED view mode
+                if (currentMode !== 'EXPLODED') return;
+
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(layerMeshes, true);
+
+                if (intersects.length > 0) {
+                    let obj = intersects[0].object;
+                    // Traverse up to find parent with layer ID if hit inside a child group (e.g. LC molecules)
+                    while (obj && obj.userData.id === undefined && obj.parent) {
+                        obj = obj.parent;
+                    }
+                    if (obj && obj.userData.id !== undefined) {
+                        inspectComponent(obj.userData.id);
+                    }
+                }
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- LAYER & LC CREATION ---
+        function createLCDComponents() {
+            // Helper texture generator for polarizer grating lines
+            function createPolarizerTexture(isVertical) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'rgba(20, 30, 45, 0.85)';
+                ctx.fillRect(0, 0, 256, 256);
+                ctx.strokeStyle = '#00f0ff';
+                ctx.lineWidth = 3;
+                
+                const step = 8;
+                for (let i = 0; i < 256; i += step) {
+                    ctx.beginPath();
+                    if (isVertical) {
+                        ctx.moveTo(i, 0);
+                        ctx.lineTo(i, 256);
+                    } else {
+                        ctx.moveTo(0, i);
+                        ctx.lineTo(256, i);
+                    }
+                    ctx.stroke();
+                }
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                return texture;
+            }
+
+            // Helper texture generator for SnO2 electrode grid pattern
+            function createSnO2Texture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = 'rgba(255, 200, 0, 0.05)';
+                ctx.fillRect(0, 0, 256, 256);
+                ctx.strokeStyle = '#eab308';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(10, 10, 236, 236);
+                
+                // Segments grid
+                for (let i = 40; i < 240; i += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 10);
+                    ctx.lineTo(i, 246);
+                    ctx.stroke();
+                }
+                return new THREE.CanvasTexture(canvas);
+            }
+
+            const glassGeometry = new THREE.BoxGeometry(10, 8, 0.4);
+
+            COMPONENT_DATA.forEach((data) => {
+                const layerGroup = new THREE.Group();
+                layerGroup.userData = { id: data.id, baseZ: 0 };
+
+                let mesh;
+                if (data.id === 0 || data.id === 6) {
+                    // Polarizers with high contrast colored trim & directional lines
+                    const polTex = createPolarizerTexture(data.id === 0);
+                    const mat = new THREE.MeshStandardMaterial({
+                        map: polTex,
+                        transparent: true,
+                        opacity: 0.8,
+                        roughness: 0.2,
+                        metalness: 0.1,
+                        side: THREE.DoubleSide
+                    });
+                    mesh = new THREE.Mesh(glassGeometry, mat);
+
+                    // Glowing border outline frame
+                    const edges = new THREE.EdgesGeometry(glassGeometry);
+                    const lineMat = new THREE.LineBasicMaterial({ color: data.color, linewidth: 2 });
+                    const wireframe = new THREE.LineSegments(edges, lineMat);
+                    mesh.add(wireframe);
+
+                } else if (data.id === 1 || data.id === 5) {
+                    // Transparent Glass Substrates with glowing rim tint
+                    const glassMat = new THREE.MeshPhysicalMaterial({
+                        color: 0xffffff,
+                        transmission: 0.85,
+                        opacity: 1,
+                        transparent: true,
+                        roughness: 0.1,
+                        ior: 1.5,
+                        thickness: 1.2,
+                        clearcoat: 1.0,
+                        clearcoatRoughness: 0.1
+                    });
+                    mesh = new THREE.Mesh(glassGeometry, glassMat);
+
+                    const edges = new THREE.EdgesGeometry(glassGeometry);
+                    const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 1.5 });
+                    const wireframe = new THREE.LineSegments(edges, lineMat);
+                    mesh.add(wireframe);
+
+                } else if (data.id === 2 || data.id === 4) {
+                    // SnO2 Conductive Electrode Layers
+                    const electrodeTex = createSnO2Texture();
+                    const electrodeMat = new THREE.MeshStandardMaterial({
+                        map: electrodeTex,
+                        transparent: true,
+                        opacity: 0.75,
+                        roughness: 0.3,
+                        emissive: 0xca8a04,
+                        emissiveIntensity: 0.2,
+                        side: THREE.DoubleSide
+                    });
+                    const thinGeo = new THREE.BoxGeometry(9.8, 7.8, 0.1);
+                    mesh = new THREE.Mesh(thinGeo, electrodeMat);
+
+                } else if (data.id === 3) {
+                    // Liquid Crystal Cell Chamber
+                    const cellFrameGeo = new THREE.BoxGeometry(10.2, 8.2, 1.2);
+                    const edges = new THREE.EdgesGeometry(cellFrameGeo);
+                    const lineMat = new THREE.LineBasicMaterial({ color: 0x00f0ff });
+                    mesh = new THREE.LineSegments(edges, lineMat);
+
+                    // Create Helical Nematic LC Rod Molecules
+                    createLCMolecules(layerGroup);
+                }
+
+                layerGroup.add(mesh);
+                layerGroup.position.z = 0; // Packed position initially
+                layersGroup.add(layerGroup);
+                layerMeshes.push(layerGroup);
+            });
+        }
+
+        // Generate Nematic Liquid Crystal Rods in 90° Twisted Helical Matrix
+        function createLCMolecules(parentGroup) {
+            const numLayers = 9;
+            const rows = 5;
+            const cols = 7;
+            const rodGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.0, 16);
+            
+            // Bright LC material with emissive glow
+            lcMoleculeMat = new THREE.MeshStandardMaterial({
+                color: 0x38bdf8,
+                emissive: 0x0284c7,
+                emissiveIntensity: 0.6,
+                roughness: 0.2,
+                metalness: 0.3
+            });
+
+            const startZ = -0.5;
+            const stepZ = 1.0 / (numLayers - 1);
+
+            for (let l = 0; l < numLayers; l++) {
+                const layerZ = startZ + l * stepZ;
+                const twistAngle = (l / (numLayers - 1)) * (Math.PI / 2); // 0 to 90 degrees helical twist
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const rod = new THREE.Mesh(rodGeo, lcMoleculeMat);
+                        const posX = -3.5 + c * 1.16;
+                        const posY = -2.5 + r * 1.25;
+
+                        rod.position.set(posX, posY, layerZ);
+                        
+                        // Store rotational parameters for state transitions
+                        rod.userData = {
+                            offRotation: new THREE.Euler(0, 0, twistAngle),
+                            onRotation: new THREE.Euler(Math.PI / 2, 0, 0), // Vertically aligned along Z
+                            layerIndex: l
+                        };
+
+                        rod.rotation.copy(rod.userData.offRotation);
+                        parentGroup.add(rod);
+                        lcMolecules.push(rod);
+                    }
+                }
+            }
+        }
+
+        // --- LIGHT WAVE DYNAMICS & BEAM VISUALIZATION ---
+        function createLightWaveVisualization() {
+            // Animated light ray wave curve
+            const curvePoints = [];
+            for (let z = -14; z <= 14; z += 0.2) {
+                curvePoints.push(new THREE.Vector3(0, 0, z));
+            }
+
+            const curve = new THREE.CatmullRomCurve3(curvePoints);
+            const tubeGeo = new THREE.TubeGeometry(curve, 120, 0.08, 8, false);
+            
+            lightBeamMaterial = new THREE.MeshBasicMaterial({
+                color: 0x00f0ff,
+                wireframe: true,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            waveCurveMesh = new THREE.Mesh(tubeGeo, lightBeamMaterial);
+            lightBeamsGroup.add(waveCurveMesh);
+        }
+
+        // Dynamically recalculate polarized light sine-wave propagation trajectory
+        function updateLightWave() {
+            if (!waveCurveMesh) return;
+
+            const time = Date.now() * 0.005;
+            const points = [];
+            const numPoints = 140;
+
+            for (let i = 0; i <= numPoints; i++) {
+                const t = i / numPoints;
+                const z = -14 + t * 28; // z from -14 to +14
+
+                let amplitudeX = 0;
+                let amplitudeY = 0;
+
+                if (z < -10.5) {
+                    // Unpolarized initial backlight (vibrating in radial circles)
+                    amplitudeX = Math.sin(time + z * 2) * 1.2;
+                    amplitudeY = Math.cos(time + z * 2) * 1.2;
+                } else if (z >= -10.5 && z < 0) {
+                    // Polarized at 0° Vertical (Y-axis vertical sine wave)
+                    amplitudeX = 0;
+                    amplitudeY = Math.sin(time - z * 3) * 1.4;
+                } else if (z >= 0 && z < 10.5) {
+                    if (currentMode === 'OFF') {
+                        // Twist 90° into Horizontal X-axis wave
+                        const factor = (z / 10.5);
+                        const angle = factor * (Math.PI / 2);
+                        const waveVal = Math.sin(time - z * 3) * 1.4;
+                        amplitudeX = waveVal * Math.sin(angle);
+                        amplitudeY = waveVal * Math.cos(angle);
+                    } else {
+                        // Voltage ON: Remains strictly 0° Vertical wave, cannot rotate
+                        amplitudeX = 0;
+                        amplitudeY = Math.sin(time - z * 3) * 1.4;
+                    }
+                } else if (z >= 10.5) {
+                    if (currentMode === 'OFF') {
+                        // Light successfully passes 90° Front Polarizer horizontally
+                        amplitudeX = Math.sin(time - z * 3) * 1.4;
+                        amplitudeY = 0;
+                    } else {
+                        // Light BLOCKED at front 90° crossed polarizer (0 amplitude)
+                        amplitudeX = 0;
+                        amplitudeY = 0;
+                    }
+                }
+
+                points.push(new THREE.Vector3(amplitudeX, amplitudeY, z));
+            }
+
+            const newCurve = new THREE.CatmullRomCurve3(points);
+            waveCurveMesh.geometry.dispose();
+            waveCurveMesh.geometry = new THREE.TubeGeometry(newCurve, 140, 0.06, 8, false);
+        }
+
+        // --- MODE INTERACTION LOGIC ---
+        function setMode(mode) {
+            currentMode = mode;
+
+            // UI Tab Active State Styling Updates
+            const tabs = ['off', 'on', 'exploded'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab-${t}`);
+                if (t === mode.toLowerCase()) {
+                    btn.className = "px-4 py-2 rounded-lg text-xs md:text-sm font-semibold font-orbitron transition-all duration-300 flex items-center gap-2 bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_15px_rgba(0,240,255,0.2)]";
+                } else {
+                    btn.className = "px-4 py-2 rounded-lg text-xs md:text-sm font-semibold font-orbitron transition-all duration-300 flex items-center gap-2 text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/10";
+                }
+            });
+
+            const compNav = document.getElementById('component-nav');
+            const infoCard = document.getElementById('info-card');
+            const infoTag = document.getElementById('info-tag');
+            const infoTitle = document.getElementById('info-title');
+            const infoBody = document.getElementById('info-body');
+            const statusIcon = document.getElementById('status-icon');
+            const metricTwist = document.getElementById('metric-twist');
+            const metricLight = document.getElementById('metric-light');
+            const pixelGlow = document.getElementById('pixel-glow');
+            const pixelDisplay = document.getElementById('pixel-display-surface');
+            const pixelIcon = document.getElementById('pixel-icon');
+            const pixelText = document.getElementById('pixel-status-text');
+
+            if (mode === 'EXPLODED') {
+                // Expand side navigation panel
+                compNav.classList.remove('opacity-0', 'pointer-events-none');
+                compNav.classList.add('opacity-100', 'pointer-events-auto');
+
+                // Animate components into exploded positions along Z-axis
+                COMPONENT_DATA.forEach((data, index) => {
+                    gsap.to(layerMeshes[index].position, {
+                        z: data.targetZ,
+                        duration: 1.2,
+                        ease: "power3.out"
+                    });
+                });
+
+                // Camera transition for exploded overview
+                gsap.to(camera.position, { x: 30, y: 16, z: 25, duration: 1.5 });
+                gsap.to(controls.target, { x: 0, y: 0, z: 0, duration: 1.5 });
+
+                infoTag.innerText = "MODE: EXPLODED ASSEMBLY";
+                infoTitle.innerText = "LCD Substrate Layer Decomposition";
+                infoBody.innerText = "Click on any individual layer on the left menu or directly inside the 3D canvas to isolate and view its optical function within the assembly.";
+                statusIcon.innerHTML = `<i class="fa-solid fa-layer-group"></i>`;
+                metricTwist.innerText = "Exploded Spacing";
+                metricLight.innerText = "Interactive View";
+
+            } else {
+                // Hide component nav panel
+                compNav.classList.add('opacity-0', 'pointer-events-none');
+                compNav.classList.remove('opacity-100', 'pointer-events-auto');
+
+                // Reset layer stack positions to compact state
+                layerMeshes.forEach((meshGroup, idx) => {
+                    const stackedZ = (idx - 3) * 0.6; // Packed stacking
+                    gsap.to(meshGroup.position, {
+                        z: stackedZ,
+                        duration: 1.2,
+                        ease: "power3.inOut"
+                    });
+                });
+
+                // Camera default focus
+                gsap.to(camera.position, { x: 22, y: 14, z: 28, duration: 1.5 });
+                gsap.to(controls.target, { x: 0, y: 0, z: 0, duration: 1.5 });
+
+                if (mode === 'OFF') {
+                    // Animate LC molecules into 90° twisted state
+                    lcMolecules.forEach(rod => {
+                        gsap.to(rod.rotation, {
+                            x: rod.userData.offRotation.x,
+                            y: rod.userData.offRotation.y,
+                            z: rod.userData.offRotation.z,
+                            duration: 1.0,
+                            ease: "power2.out"
+                        });
+                    });
+
+                    // Light Beam & UI update
+                    lightBeamMaterial.color.setHex(0x00f0ff);
+                    infoTag.innerText = "STATE: NO VOLTAGE (V = 0)";
+                    infoTitle.innerText = "Light Transmitting (Pixel Bright)";
+                    infoBody.innerText = "Without an electric field, liquid crystal molecules naturally arrange in a continuous 90° helical twist between alignment layers. Backlight polarized at 0° by the rear filter follows this molecular twist and rotates 90°, matching the orientation of the front crossed polarizer and allowing light to pass freely.";
+                    statusIcon.innerHTML = `<i class="fa-solid fa-lightbulb text-cyan-300"></i>`;
+                    metricTwist.innerText = "90° Helical Alignment";
+                    metricLight.innerText = "100% Transmission";
+
+                    pixelGlow.className = "absolute inset-0 bg-cyan-400/80 blur-sm transition-all duration-500";
+                    pixelDisplay.className = "relative z-10 w-full h-full rounded flex items-center justify-center border border-white bg-white text-slate-900 transition-all duration-500 shadow-[0_0_15px_#ffffff]";
+                    pixelIcon.innerText = "ON";
+                    pixelText.innerText = "BRIGHT STATE (LIGHT ON)";
+                    pixelText.className = "text-xs font-bold font-mono text-cyan-300";
+
+                } else if (mode === 'ON') {
+                    // Animate LC molecules into vertical alignment along Z-axis
+                    lcMolecules.forEach(rod => {
+                        gsap.to(rod.rotation, {
+                            x: rod.userData.onRotation.x,
+                            y: rod.userData.onRotation.y,
+                            z: rod.userData.onRotation.z,
+                            duration: 1.0,
+                            ease: "power2.out"
+                        });
+                    });
+
+                    // Light Beam & UI update
+                    lightBeamMaterial.color.setHex(0xffaa00);
+                    infoTag.innerText = "STATE: APPLIED VOLTAGE (V > Vth)";
+                    infoTitle.innerText = "Light Blocked (Pixel Dark)";
+                    infoBody.innerText = "Applying electric voltage across the SnO₂ electrode layers creates a perpendicular electric field. Liquid crystal dipoles align vertically along the field lines, untwisting the helix. Polarized backlight passes through unchanged at 0° and is blocked by the front 90° polarizer, creating a dark pixel.";
+                    statusIcon.innerHTML = `<i class="fa-solid fa-moon text-amber-400"></i>`;
+                    metricTwist.innerText = "0° Vertical Alignment";
+                    metricLight.innerText = "0% (Blocked)";
+
+                    pixelGlow.className = "absolute inset-0 bg-transparent blur-none transition-all duration-500";
+                    pixelDisplay.className = "relative z-10 w-full h-full rounded flex items-center justify-center border border-slate-700 bg-slate-950 text-slate-600 transition-all duration-500";
+                    pixelIcon.innerText = "OFF";
+                    pixelText.innerText = "DARK STATE (PIXEL OFF)";
+                    pixelText.className = "text-xs font-bold font-mono text-amber-400";
+                }
+            }
+        }
+
+        // Inspect focused component in Exploded View Mode
+        function inspectComponent(index) {
+            if (currentMode !== 'EXPLODED') setMode('EXPLODED');
+
+            explodedIndex = index;
+            const targetComp = COMPONENT_DATA[index];
+
+            // Highlight selected component in menu
+            const buttons = document.querySelectorAll('.comp-btn');
+            buttons.forEach((btn, idx) => {
+                if (idx === index) {
+                    btn.classList.add('bg-cyan-500/30', 'border-cyan-400', 'text-white', 'shadow-[0_0_10px_rgba(0,240,255,0.4)]');
+                } else {
+                    btn.classList.remove('bg-cyan-500/30', 'border-cyan-400', 'text-white', 'shadow-[0_0_10px_rgba(0,240,255,0.4)]');
+                }
+            });
+
+            // Smooth camera transition to focus on target component position
+            gsap.to(camera.position, {
+                x: 12,
+                y: 6,
+                z: targetComp.targetZ + 12,
+                duration: 1.2,
+                ease: "power2.out"
+            });
+
+            gsap.to(controls.target, {
+                x: 0,
+                y: 0,
+                z: targetComp.targetZ,
+                duration: 1.2,
+                ease: "power2.out"
+            });
+
+            // Update info card text
+            document.getElementById('info-tag').innerText = `LAYER ${index + 1} OF 7`;
+            document.getElementById('info-title').innerText = targetComp.name;
+            document.getElementById('info-body').innerText = targetComp.desc;
+            document.getElementById('metric-twist').innerText = "Focus Mode";
+            document.getElementById('metric-light').innerText = `Z-Pos: ${targetComp.targetZ}mm`;
+        }
+
+        function resetExplodedView() {
+            setMode('EXPLODED');
+        }
+
+        // --- ANIMATION & RENDER LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Orbit Controls update
+            controls.update();
+
+            // Real-time light wave curve updates
+            updateLightWave();
+
+            // Subtle rotation animation for LC molecules in OFF mode
+            if (currentMode === 'OFF') {
+                const t = Date.now() * 0.002;
+                lcMolecules.forEach((rod, idx) => {
+                    rod.position.y += Math.sin(t + idx) * 0.0015;
+                });
+            }
+
+            // Render 3D Scene
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
